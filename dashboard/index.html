@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LaunchScope — token launch radar</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="masthead">
+  <div class="radar-ring" aria-hidden="true"><span class="sweep"></span><span class="dot d1"></span><span class="dot d2"></span><span class="dot d3"></span></div>
+  <div class="masthead-text">
+    <h1>LAUNCH<span>SCOPE</span></h1>
+    <p class="tagline">Which pre-token protocol is worth farming next — and what to do about it.</p>
+    <p class="snapshot-line" id="snapshot-line">Loading the sealed snapshot…</p>
+  </div>
+</header>
+
+<section class="stats" id="stats" aria-label="Board summary"></section>
+
+<section class="controls" aria-label="Board filters">
+  <label class="ctl search">Search <input id="q" type="search" placeholder="protocol name or slug…" autocomplete="off"></label>
+  <label class="ctl">Category <select id="cat"><option value="">All categories</option></select></label>
+  <label class="ctl">Chain <select id="chain"><option value="">All chains</option></select></label>
+  <label class="ctl">Min TVL <select id="mintvl"><option value="0">Any</option><option value="10000000">$10M</option><option value="25000000">$25M</option><option value="50000000">$50M</option><option value="100000000">$100M</option></select></label>
+  <label class="ctl check"><input id="watchonly" type="checkbox"> Watchlist only</label>
+  <span class="count" id="count"></span>
+</section>
+
+<section class="detail" id="detail" hidden aria-label="Protocol detail"></section>
+
+<main>
+  <table class="board" id="board">
+    <thead>
+      <tr>
+        <th data-sort="rank" class="num sorted-asc">Rank</th>
+        <th data-sort="name">Protocol</th>
+        <th data-sort="category">Category</th>
+        <th data-sort="chains">Chains</th>
+        <th data-sort="tvl_usd" class="num">TVL</th>
+        <th data-sort="change_7d" class="num">7d</th>
+        <th data-sort="implied_value_usd" class="num">Implied value</th>
+        <th class="flag">Watchlist</th>
+      </tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <p class="empty" id="empty" hidden>No protocol matches these filters. Loosen one and the board fills again.</p>
+</main>
+
+<section class="method" id="method" aria-label="How the value is worked out">
+  <h2>How the implied value is worked out</h2>
+  <p class="formula">implied value = TVL × category multiple × growth factor × age factor</p>
+  <div class="method-grid">
+    <div><h3>Category multiple</h3><p id="method-cat">A table by DefiLlama category: what a dollar of TVL in that kind of protocol is worth if it ever issues a token. RWA scores highest, bridges lowest.</p></div>
+    <div><h3>Growth factor</h3><p>1 + the seven-day TVL change, clamped to −50%…+100%, divided by 250. A protocol up 100% in a week scores 1.40; one down 50% scores 0.80.</p></div>
+    <div><h3>Age factor</h3><p>1 + 0.25 × log-scaled months since listing, capped at 24 months. A protocol that has run with no token for two years scores 1.25; a newborn scores 1.00.</p></div>
+  </div>
+  <p class="fine">Every row's three factors are shown in its detail view, so any value can be checked against the protocol's own figures. The model is <code>launchscope-1</code>; no protocol name is ever special-cased. Implied values are this entry's own claim, never a prediction that a token will be issued or what it will trade at.</p>
+  <p class="fine">Farm steps are generic guidance derived from a protocol's category and chains. They are not financial advice. Never pay to claim, never share a seed phrase, and check every step on the protocol's own page.</p>
+</section>
+
+<section class="launched" aria-label="Protocols whose token already trades">
+  <h2>Already launched — the market's own values</h2>
+  <p class="fine">These protocols record a token, so they are not on the board. Their market cap is the market's own value, not this model's. They are here so the board's pre-token rows are never confused with tokens that already trade.</p>
+  <table class="board live" id="live">
+    <thead><tr><th>Protocol</th><th>Category</th><th>Chains</th><th class="num">TVL</th><th class="num">Market cap</th><th class="num">7d</th></tr></thead>
+    <tbody id="live-rows"></tbody>
+  </table>
+</section>
+
+<footer>
+  <p>LaunchScope — a token launch radar. Data: DefiLlama protocols snapshot, <span id="asof"></span>. The snapshot is sealed: every run reads the same bytes.</p>
+</footer>
+
+<script src="../data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
