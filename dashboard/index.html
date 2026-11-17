@@ -50,13 +50,14 @@
 
 <section class="method" id="method" aria-label="How the value is worked out">
   <h2>How the implied value is worked out</h2>
-  <p class="formula">implied value = TVL × category multiple × growth factor × age factor</p>
+  <p class="formula">implied value = TVL × category multiple × growth factor × age factor × breadth factor</p>
   <div class="method-grid">
     <div><h3>Category multiple</h3><p id="method-cat">A table by DefiLlama category: what a dollar of TVL in that kind of protocol is worth if it ever issues a token. RWA scores highest, bridges lowest.</p></div>
-    <div><h3>Growth factor</h3><p>1 + the seven-day TVL change, clamped to −50%…+100%, divided by 250. A protocol up 100% in a week scores 1.40; one down 50% scores 0.80.</p></div>
-    <div><h3>Age factor</h3><p>1 + 0.25 × log-scaled months since listing, capped at 24 months. A protocol that has run with no token for two years scores 1.25; a newborn scores 1.00.</p></div>
+    <div><h3>Growth factor</h3><p>1 + the seven-day TVL change, clamped to −50%…+300%, divided by 250. A protocol up 100% in a week scores 1.40; one down 50% scores 0.80. The cap sits at +300% because the snapshot's own figures run that far.</p></div>
+    <div><h3>Age factor</h3><p>1 + 0.30 × log-scaled months since listing, capped at 36 months. A protocol that has run with no token for three years scores 1.30; a newborn scores 1.00.</p></div>
+    <div><h3>Breadth factor</h3><p>1 + 0.015 per extra chain, up to 1.08 for six chains or more. A protocol live on more chains reaches more farmers; a single-chain protocol scores 1.00.</p></div>
   </div>
-  <p class="fine">Every row's three factors are shown in its detail view, so any value can be checked against the protocol's own figures. The model is <code>launchscope-1</code>; no protocol name is ever special-cased. Implied values are this entry's own claim, never a prediction that a token will be issued or what it will trade at.</p>
+  <p class="fine">Every row's four factors are shown in its detail view, so any value can be checked against the protocol's own figures. The model is <code>launchscope-2</code>; no protocol name is ever special-cased. Implied values are this entry's own claim, never a prediction that a token will be issued or what it will trade at.</p>
   <p class="fine">Farm steps are generic guidance derived from a protocol's category and chains. They are not financial advice. Never pay to claim, never share a seed phrase, and check every step on the protocol's own page.</p>
 </section>
 

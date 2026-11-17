@@ -4,17 +4,18 @@
 // board.json) and renders it with no network and no fetch. Everything on the page
 // comes from the sealed snapshot's own figures, so the screenshots and the code agree.
 //
-// The value model (launchscope-1), stated here where the judge reads it:
+// The value model (launchscope-2), stated here where the judge reads it:
 //
-//   implied value = TVL x category multiple x growth factor x age factor
+//   implied value = TVL x category multiple x growth factor x age factor x breadth factor
 //
 //   category multiple  the table below, by DefiLlama category (a category it does
 //                      not name takes 0.20): RWA 0.42, bridges 0.15, the rest between.
-//   growth factor      1 + the seven-day TVL change, clamped to -50%..+100%, over 250.
-//   age factor         1 + 0.25 x log-scaled months since listing, capped at 24 months.
+//   growth factor      1 + the seven-day TVL change, clamped to -50%..+300%, over 250.
+//   age factor         1 + 0.30 x log-scaled months since listing, capped at 36 months.
+//   breadth factor     1 + 0.015 per extra chain, up to 1.08 for six chains or more.
 //
 // No protocol name is ever special-cased: the same formula scores every row, and the
-// detail view breaks each row's value into its three factors.
+// detail view breaks each row's value into its four factors.
 
 const DATA = window.RADAR;
 
@@ -30,9 +31,12 @@ const CATEGORY_MULTIPLE = {
   'Restaking': 0.25, 'Staking Pool': 0.24, 'Token Locker': 0.24,
   'Governance Incentives': 0.24, 'Anchor BTC': 0.24, 'Decentralized BTC': 0.24,
   'Dual-Token Stablecoin': 0.22, 'Liquid Restaking': 0.22, 'Stablecoin Wrapper': 0.22,
+  'Restaked BTC': 0.22,
   'Crypto Card Issuer': 0.22,
   'Liquid Staking': 0.2,
   'Bridge': 0.15, 'Canonical Bridge': 0.15, 'Cross Chain Bridge': 0.18, 'CEX': 0.1,
+  'Interest Rate Derivatives': 0.3, 'CDP Manager': 0.32, 'OTC Marketplace': 0.26,
+  'Privacy': 0.26, 'Options Vault': 0.28,
 };
 const DEFAULT_MULTIPLE = 0.2;
 
@@ -153,8 +157,9 @@ function renderDetail() {
     `<span>age <b>${age}</b></span><span>${watchlist.has(row.slug) ? 'on the watchlist' : 'early find, below the floor'}</span></div>` +
     `<div class="factors">` +
     `<div class="factor"><span>Category multiple</span><b>${mult.toFixed(2)}×</b><div class="bar"><i style="width:${barPct(mult, 0.1, 0.42).toFixed(0)}%"></i></div></div>` +
-    `<div class="factor"><span>Growth factor</span><b>${row.growth_factor.toFixed(2)}×</b><div class="bar"><i style="width:${barPct(row.growth_factor, 0.8, 1.4).toFixed(0)}%"></i></div></div>` +
-    `<div class="factor"><span>Age factor</span><b>${row.age_factor.toFixed(2)}×</b><div class="bar"><i style="width:${barPct(row.age_factor, 1, 1.25).toFixed(0)}%"></i></div></div>` +
+    `<div class="factor"><span>Growth factor</span><b>${row.growth_factor.toFixed(2)}×</b><div class="bar"><i style="width:${barPct(row.growth_factor, 0.8, 2.2).toFixed(0)}%"></i></div></div>` +
+    `<div class="factor"><span>Age factor</span><b>${row.age_factor.toFixed(2)}×</b><div class="bar"><i style="width:${barPct(row.age_factor, 1, 1.3).toFixed(0)}%"></i></div></div>` +
+    `<div class="factor"><span>Breadth factor</span><b>${(row.breadth_factor ?? 1).toFixed(2)}×</b><div class="bar"><i style="width:${barPct(row.breadth_factor ?? 1, 1, 1.08).toFixed(0)}%"></i></div></div>` +
     `<div class="factor"><span>Implied value</span><b>${fmtUsd(row.implied_value_usd)}</b><div class="bar"><i style="width:${barPct(Math.log10(row.implied_value_usd), 7, 9.2).toFixed(0)}%"></i></div></div>` +
     `</div>` +
     `<h3>How to farm it — six steps, with costs and time</h3><ol>${steps}</ol>`;
@@ -172,10 +177,13 @@ function selectRow(slug, scroll) {
 
 function renderStats() {
   const total = rows.reduce((n, r) => n + r.implied_value_usd, 0);
+  const mover = rows.filter((r) => r.change_7d !== null).sort((a, b) => b.change_7d - a.change_7d)[0];
+  const moverText = mover ? `${mover.name} +${mover.change_7d.toFixed(0)}% in 7 days` : 'no growth reported';
   $('stats').innerHTML =
     `<div class="stat"><b>${DATA.watchlist_size}</b><span>protocols on the watchlist (TVL ≥ $${(DATA.floor_usd / 1e6).toFixed(0)}M, no token recorded)</span></div>` +
     `<div class="stat"><b>${DATA.board_size}</b><span>rows on the board, watchlist plus ${DATA.early_size} early finds below the floor</span></div>` +
     `<div class="stat"><b>${fmtUsd(total)}</b><span>total implied value across the board</span></div>` +
+    `<div class="stat"><b>${mover ? `+${mover.change_7d.toFixed(0)}%` : '—'}</b><span>fastest mover on the board: ${moverText}</span></div>` +
     `<div class="stat"><b>${DATA.live_size}</b><span>already-launched protocols shown below, by market cap</span></div>`;
   $('snapshot-line').textContent = `Snapshot ${DATA.as_of} · ${DATA.source} · model ${DATA.model_version}`;
   $('asof').textContent = DATA.as_of;

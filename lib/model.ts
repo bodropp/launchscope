@@ -8,18 +8,27 @@
 //
 // Implied value follows only from the snapshot's own figures, never from a list of names:
 //
-//   implied = TVL x categoryMultiple x growthFactor x ageFactor
+//   implied = TVL x categoryMultiple x growthFactor x ageFactor x breadthFactor
 //
 //   categoryMultiple  a table by DefiLlama category (below): what a dollar of TVL in that
 //                     kind of protocol is worth if it ever issues a token. RWA and
 //                     launchpads score highest, bridges lowest, everything else 0.20.
-//   growthFactor      = 1 + clamp(change_7d, -50, +100) / 250: a protocol whose TVL grew
-//                     100% in a week scores 1.40, one that fell 50% scores 0.80.
-//   ageFactor         = 1 + 0.25 x min(log10(1 + ageMonths) / log10(25), 1): a protocol
-//                     that has run with no token for two years scores 1.25, a newborn 1.00.
-//                     Age in months is log-scaled and capped at 24 months, so time adds
-//                     value that flattens out instead of running away. Unknown age counts
-//                     as 12 months.
+//                     The table names every category the snapshot's pre-token protocols
+//                     carry, so no row falls back to the default by accident.
+//   growthFactor      = 1 + clamp(change_7d, -50, +300) / 250: a protocol whose TVL grew
+//                     100% in a week scores 1.40, one that fell 50% scores 0.80. The cap
+//                     sits at +300% because the snapshot's own figures run that far: three
+//                     pre-token protocols grew past 100% in a week, the fastest by 4,448%,
+//                     and a cap of 100% would score them all the same as a protocol up
+//                     exactly 100%.
+//   ageFactor         = 1 + 0.30 x min(log10(1 + ageMonths) / log10(37), 1): a protocol
+//                     that has run with no token for three years scores 1.30, one that has
+//                     run two years scores about 1.27, a newborn 1.00. Age in months is
+//                     log-scaled and capped at 36 months, so time adds value that flattens
+//                     out instead of running away. Unknown age counts as 12 months.
+//   breadthFactor     = 1 + 0.015 x min(chains - 1, 5): a protocol live on more chains
+//                     reaches more farmers, so each extra chain adds 1.5% of value, up to
+//                     7.5% for six chains or more. A single-chain protocol scores 1.00.
 //
 // The constants are the model's, stated in the dashboard and shown per row in the detail
 // view, so a reader can check any row's value against its own figures. No protocol name
@@ -59,20 +68,24 @@ export interface ModelConstants {
   age_weight: number;
   age_cap_months: number;
   unknown_age_months: number;
+  breadth_step: number;
+  breadth_cap_chains: number;
 }
 
 export const MODEL: ModelConstants = {
   default_multiple: 0.2,
   growth_floor: -50,
-  growth_cap: 100,
+  growth_cap: 300,
   growth_divisor: 250,
-  age_weight: 0.25,
-  age_cap_months: 24,
+  age_weight: 0.3,
+  age_cap_months: 36,
   unknown_age_months: 12,
+  breadth_step: 0.015,
+  breadth_cap_chains: 6,
 };
 
 /** The model's version label: the dashboard names it and the rules quote it. */
-export const MODEL_VERSION = 'launchscope-1';
+export const MODEL_VERSION = 'launchscope-2';
 
 /** How many pre-token protocols below the watchlist floor the early radar carries, by TVL. */
 export const EARLY_ROWS = 160;
@@ -116,12 +129,18 @@ export const CATEGORY_MULTIPLE: Record<string, number> = {
   'Dual-Token Stablecoin': 0.22,
   'Liquid Restaking': 0.22,
   'Stablecoin Wrapper': 0.22,
+  'Restaked BTC': 0.22,
   'Crypto Card Issuer': 0.22,
   'Liquid Staking': 0.2,
   'Bridge': 0.15,
   'Canonical Bridge': 0.15,
   'Cross Chain Bridge': 0.18,
   'CEX': 0.1,
+  'Interest Rate Derivatives': 0.3,
+  'CDP Manager': 0.32,
+  'OTC Marketplace': 0.26,
+  'Privacy': 0.26,
+  'Options Vault': 0.28,
 };
 
 /** A farm step: the action, what it costs, and how long it takes. */
@@ -153,6 +172,7 @@ export interface BoardRow {
     growth_pct: number;
     growth_factor: number;
     age_factor: number;
+    breadth_factor: number;
     age_months: number;
   };
   farm_steps: string[];
@@ -173,6 +193,7 @@ export interface RadarRow {
   category_multiple: number;
   growth_factor: number;
   age_factor: number;
+  breadth_factor: number;
   farm_steps: string[];
 }
 
@@ -253,19 +274,26 @@ export function ageFactor(months: number, model: ModelConstants = MODEL): number
   return 1 + model.age_weight * Math.min(scaled, 1);
 }
 
-/** The three factors and the implied value one protocol gets under `model`. */
+/** The breadth factor: each extra chain adds a little value, capped, so reach counts without running away. */
+export function breadthFactor(chains: string[], model: ModelConstants = MODEL): number {
+  const extra = Math.min(Math.max(chains.length - 1, 0), model.breadth_cap_chains - 1);
+  return 1 + model.breadth_step * extra;
+}
+
+/** The four factors and the implied value one protocol gets under `model`. */
 export function impliedValue(
   protocol: SnapshotProtocol,
   asOf: string,
   model: ModelConstants = MODEL,
-): { implied: number; multiple: number; growthPct: number; growthFactor: number; ageFactor: number; age: number | null; months: number } {
+): { implied: number; multiple: number; growthPct: number; growthFactor: number; ageFactor: number; breadthFactor: number; age: number | null; months: number } {
   const age = ageDays(asOf, protocol.listed_at);
   const months = ageMonths(asOf, protocol.listed_at, model);
   const multiple = categoryMultiple(protocol.category, model);
   const { growthPct, growthFactor: gf } = growthFactor(protocol.change_7d, model);
   const af = ageFactor(months, model);
-  const implied = Math.max(1, Math.round(protocol.tvl_usd * multiple * gf * af));
-  return { implied, multiple, growthPct, growthFactor: gf, ageFactor: af, age, months };
+  const bf = breadthFactor(protocol.chains, model);
+  const implied = Math.max(1, Math.round(protocol.tvl_usd * multiple * gf * af * bf));
+  return { implied, multiple, growthPct, growthFactor: gf, ageFactor: af, breadthFactor: bf, age, months };
 }
 
 /** DefiLlama's version-marker rule: a name ending in a release is a pool of another protocol. */
@@ -338,6 +366,7 @@ export function buildBoard(snapshot: Snapshot, model: ModelConstants = MODEL): B
       growth_pct: round2(s.growthPct),
       growth_factor: round4(s.growthFactor),
       age_factor: round4(s.ageFactor),
+      breadth_factor: round4(s.breadthFactor),
       age_months: round2(s.months),
     },
     farm_steps: farmSteps(s.p, s.age).map(stepText),
@@ -380,6 +409,7 @@ export function radarRow(row: BoardRow): RadarRow {
     category_multiple: row.model.category_multiple,
     growth_factor: row.model.growth_factor,
     age_factor: row.model.age_factor,
+    breadth_factor: row.model.breadth_factor,
     farm_steps: row.farm_steps,
   };
 }
